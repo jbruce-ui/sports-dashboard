@@ -1,0 +1,6 @@
+fastapi
+fastapi-mcp
+uvicorn
+httpx
+python-dotenv
+duckdb

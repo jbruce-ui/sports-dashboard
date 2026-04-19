@@ -1,0 +1,13 @@
+fastapi
+fastapi-mcp
+uvicorn
+httpx
+python-dotenv
+anthropic
+mcp
+jinja2
+pydantic
+rich
+google-auth
+google-auth-oauthlib
+google-api-python-client
