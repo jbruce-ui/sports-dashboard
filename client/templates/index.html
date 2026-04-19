@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sports Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+      min-height: 100vh;
+    }
+
+    header {
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+
+    .nav-links { display: flex; align-items: center; gap: 16px; }
+    .nav-links a { font-size: 13px; color: #2563eb; text-decoration: none; font-weight: 500; }
+    .nav-links a:hover { text-decoration: underline; }
+
+    .btn { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.15s; }
+    .btn:hover { background: #1d4ed8; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+    .btn-green { background: #059669; }
+    .btn-green:hover { background: #047857; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 20px;
+      padding: 0 24px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .card { background: white; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+    .card-full { grid-column: 1 / -1; }
+    .card-header { padding: 14px 18px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 8px; }
+    .card-header h2 { font-size: 14px; font-weight: 600; color: #374151; }
+    .card-header .actions { margin-left: auto; display: flex; gap: 8px; }
+    .card-body { padding: 0; font-size: 13.5px; color: #374151; max-height: 500px; overflow-y: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 10px 14px; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; background: #f9fafb; position: sticky; top: 0; }
+    td { padding: 10px 14px; border-bottom: 1px solid #f3f4f6; }
+    tr:hover td { background: #f9fafb; }
+
+    .score { font-weight: 700; color: #2563eb; text-align: center; }
+    .score-pending { color: #9ca3af; font-style: italic; }
+    .score-live { color: #dc2626; font-weight: 700; }
+    .team-name { font-weight: 500; }
+    .date-col { color: #6b7280; white-space: nowrap; }
+    .venue-col { color: #9ca3af; font-size: 12px; }
+    .empty { padding: 24px; color: #9ca3af; font-style: italic; font-size: 13px; text-align: center; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .tag-fav { background: #fef3c7; color: #92400e; }
+    .tag-league { background: #eff6ff; color: #1d4ed8; }
+    .tag-live { background: #fef2f2; color: #dc2626; }
+
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid #e5e7eb; padding: 0 24px; max-width: 1400px; margin: 0 auto; }
+    .tab { padding: 10px 18px; font-size: 13px; font-weight: 500; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab:hover { color: #111827; }
+    .tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+    .hidden { display: none; }
+
+    .loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: #9ca3af; gap: 10px; }
+    .spinner { width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.65s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .league-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 24px; max-width: 1400px; margin: 0 auto; }
+    .pill { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #d1d5db; background: white; transition: all 0.15s; }
+    .pill:hover { border-color: #2563eb; color: #2563eb; }
+    .pill.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+    .section-header { padding: 10px 14px 4px; font-weight: 600; font-size: 13px; color: #111827; border-top: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Sports Dashboard</h1>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/search">Search</a>
+    <a href="/standings">Standings</a>
+    <a href="/calendar">Calendar</a>
+    <a href="/chat">Chat</a>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="favorites" onclick="switchTab('favorites')">My Teams</div>
+  <div class="tab" data-tab="scoreboard" onclick="switchTab('scoreboard')">Scoreboard</div>
+</div>
+
+<!-- My Teams Tab -->
+<div id="tab-favorites" class="tab-content">
+  <div class="grid" style="padding-top:20px">
+    <div class="card">
+      <div class="card-header"><h2>Upcoming — My Teams</h2></div>
+      <div class="card-body" id="favUpcoming">
+        <div class="loading"><div class="spinner"></div> Loading...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Recent Results — My Teams</h2></div>
+      <div class="card-body" id="favResults">
+        <div class="loading"><div class="spinner"></div> Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scoreboard Tab -->
+<div id="tab-scoreboard" class="tab-content hidden">
+  <div class="league-pills" id="leaguePills"></div>
+  <div class="grid" style="padding-top:10px">
+    <div class="card card-full">
+      <div class="card-header">
+        <h2 id="scoreboardTitle">Today's Scoreboard</h2>
+        <div class="actions">
+          <input type="date" id="scoreboardDate" onchange="loadScoreboard()" style="padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+        </div>
+      </div>
+      <div class="card-body" id="scoreboardBody">
+        <div class="loading"><div class="spinner"></div> Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let selectedLeague = null;
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById('tab-' + name).classList.remove('hidden');
+    if (name === 'scoreboard' && !document.getElementById('leaguePills').innerHTML) initScoreboard();
+  }
+
+  function eventsTable(events, showCalBtn) {
+    if (!events || !events.length) return '<div class="empty">No events found</div>';
+    let html = '<table><thead><tr><th>Date</th><th>Time</th><th>Home</th><th>Score</th><th>Away</th><th>Venue</th>';
+    if (showCalBtn) html += '<th></th>';
+    html += '</tr></thead><tbody>';
+    events.forEach(e => {
+      let scoreHtml;
+      if (e.home_score != null && e.away_score != null) {
+        const cls = e.status && e.status.includes('Progress') ? 'score-live' : 'score';
+        scoreHtml = `<span class="${cls}">${e.home_score} - ${e.away_score}</span>`;
+      } else {
+        scoreHtml = '<span class="score-pending">-</span>';
+      }
+      const statusTag = e.status && e.status.includes('Progress') ? ' <span class="tag tag-live">LIVE</span>' : '';
+      html += `<tr>
+        <td class="date-col">${e.date || ''}</td>
+        <td class="date-col">${(e.time || '').substring(0,5)}</td>
+        <td class="team-name">${e.home_team || ''}</td>
+        <td>${scoreHtml}${statusTag}</td>
+        <td class="team-name">${e.away_team || ''}</td>
+        <td class="venue-col">${(e.venue || '').substring(0,30)}</td>`;
+      if (showCalBtn) {
+        html += `<td><button class="btn btn-sm btn-green" onclick='addToCalendar(${JSON.stringify(e)})'>+ Cal</button></td>`;
+      }
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  async function loadFavorites() {
+    try {
+      const favs = await (await fetch('/api/favorites')).json();
+
+      if (!favs.length) {
+        document.getElementById('favUpcoming').innerHTML = '<div class="empty">No favorites yet. <a href="/search" style="color:#2563eb">Search for teams</a> and star them!</div>';
+        document.getElementById('favResults').innerHTML = '<div class="empty">No favorites yet.</div>';
+        return;
+      }
+
+      const [upcoming, results] = await Promise.all([
+        fetch('/api/favorites/upcoming').then(r => r.json()),
+        fetch('/api/favorites/results').then(r => r.json()),
+      ]);
+
+      let upHtml = '';
+      let resHtml = '';
+      for (const [team, events] of Object.entries(upcoming)) {
+        const fav = favs.find(f => f.team_name === team);
+        const leagueTag = fav ? `<span class="tag tag-league">${fav.league_key.toUpperCase()}</span>` : '';
+        upHtml += `<div class="section-header">${team} ${leagueTag} <span class="tag tag-fav">FAV</span></div>`;
+        upHtml += eventsTable(events, true);
+      }
+      for (const [team, events] of Object.entries(results)) {
+        resHtml += `<div class="section-header">${team}</div>`;
+        resHtml += eventsTable(events, false);
+      }
+
+      document.getElementById('favUpcoming').innerHTML = upHtml || '<div class="empty">No upcoming games for your teams</div>';
+      document.getElementById('favResults').innerHTML = resHtml || '<div class="empty">No recent results</div>';
+    } catch (e) {
+      document.getElementById('favUpcoming').innerHTML = '<div class="empty">Error loading favorites</div>';
+      document.getElementById('favResults').innerHTML = '<div class="empty">Error loading favorites</div>';
+    }
+  }
+
+  async function initScoreboard() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('scoreboardDate').value = today;
+
+    const leagues = await (await fetch('/api/leagues')).json();
+    let pills = '<div class="pill active" onclick="selectLeague(null, this)">All</div>';
+    leagues.forEach(l => {
+      pills += `<div class="pill" onclick="selectLeague('${l.key}', this)">${l.name}</div>`;
+    });
+    document.getElementById('leaguePills').innerHTML = pills;
+    loadScoreboard();
+  }
+
+  function selectLeague(key, el) {
+    selectedLeague = key;
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    if (el) el.classList.add('active');
+    loadScoreboard();
+  }
+
+  async function loadScoreboard() {
+    const date = document.getElementById('scoreboardDate').value;
+    document.getElementById('scoreboardBody').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+    try {
+      if (selectedLeague) {
+        const events = await (await fetch(`/api/scoreboard/${selectedLeague}?date=${date}`)).json();
+        document.getElementById('scoreboardTitle').textContent = `${selectedLeague.toUpperCase()} — ${date}`;
+        document.getElementById('scoreboardBody').innerHTML = eventsTable(events, true);
+      } else {
+        const data = await (await fetch(`/api/scoreboard?date=${date}`)).json();
+        let html = '';
+        for (const [league, events] of Object.entries(data)) {
+          html += `<div class="section-header">${league} <span class="tag tag-league">${events.length} games</span></div>`;
+          html += eventsTable(events, true);
+        }
+        document.getElementById('scoreboardTitle').textContent = `All Leagues — ${date}`;
+        document.getElementById('scoreboardBody').innerHTML = html || '<div class="empty">No games on this date</div>';
+      }
+    } catch (e) {
+      document.getElementById('scoreboardBody').innerHTML = '<div class="empty">Error loading scoreboard</div>';
+    }
+  }
+
+  async function addToCalendar(event) {
+    const summary = `${event.home_team} vs ${event.away_team}`;
+    const body = {
+      summary,
+      start_date: event.date,
+      start_time: event.time || null,
+      venue: event.venue || null,
+      description: `League: ${event.league || ''}`,
+    };
+    try {
+      const result = await (await fetch('/api/calendar/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })).json();
+      if (result.link) {
+        alert(`Added to calendar!\n${summary}\n${event.date}`);
+      } else if (result.detail) {
+        alert('Calendar error: ' + (typeof result.detail === 'string' ? result.detail : JSON.stringify(result.detail)));
+      } else {
+        alert('Added to calendar!');
+      }
+    } catch (e) {
+      alert('Failed to add to calendar. Is Google OAuth configured?');
+    }
+  }
+
+  loadFavorites();
+</script>
+</body>
+</html>

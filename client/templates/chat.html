@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat — Sports Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+
+    .nav-links { display: flex; align-items: center; gap: 16px; }
+    .nav-links a { font-size: 13px; color: #2563eb; text-decoration: none; font-weight: 500; }
+    .nav-links a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #f3f4f6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-header h2 { font-size: 14px; font-weight: 600; color: #374151; }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 400px;
+      max-height: calc(100vh - 240px);
+    }
+
+    .msg {
+      max-width: 80%;
+      font-size: 13.5px;
+      line-height: 1.65;
+    }
+
+    .msg-user {
+      align-self: flex-end;
+      background: #2563eb;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 16px 16px 4px 16px;
+    }
+
+    .msg-assistant {
+      align-self: flex-start;
+      background: white;
+      border: 1px solid #e5e7eb;
+      color: #374151;
+      padding: 10px 14px;
+      border-radius: 16px 16px 16px 4px;
+    }
+
+    .msg-assistant h1, .msg-assistant h2, .msg-assistant h3 {
+      font-size: 13px; font-weight: 600; color: #111827; margin: 10px 0 4px;
+    }
+    .msg-assistant h1:first-child,
+    .msg-assistant h2:first-child,
+    .msg-assistant h3:first-child { margin-top: 0; }
+    .msg-assistant p { margin-bottom: 6px; }
+    .msg-assistant p:last-child { margin-bottom: 0; }
+    .msg-assistant ul, .msg-assistant ol { padding-left: 18px; margin-bottom: 6px; }
+    .msg-assistant li { margin-bottom: 2px; }
+    .msg-assistant strong { font-weight: 600; color: #111827; }
+    .msg-assistant table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+    .msg-assistant th, .msg-assistant td {
+      border: 1px solid #e5e7eb; padding: 6px 10px; font-size: 12.5px; text-align: left;
+    }
+    .msg-assistant th { background: #f9fafb; font-weight: 600; }
+    .msg-assistant code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+    .msg-assistant pre { background: #f3f4f6; padding: 10px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+    .msg-assistant pre code { background: none; padding: 0; }
+
+    .tools-chip {
+      font-size: 11px; color: #9ca3af; margin-top: 4px; align-self: flex-start;
+    }
+
+    .typing {
+      align-self: flex-start;
+      display: flex; gap: 4px; padding: 12px 16px;
+      background: white; border: 1px solid #e5e7eb;
+      border-radius: 16px 16px 16px 4px;
+    }
+    .typing span {
+      width: 7px; height: 7px; background: #9ca3af; border-radius: 50%;
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.15s; }
+    .typing span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    .input-area {
+      border-top: 1px solid #e5e7eb;
+      padding: 14px 18px;
+      display: flex; gap: 10px; align-items: flex-end;
+    }
+
+    #chatInput {
+      flex: 1; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 10px 14px; font-family: inherit; font-size: 13.5px;
+      line-height: 1.5; resize: none; outline: none;
+      max-height: 120px; overflow-y: auto;
+    }
+    #chatInput:focus { border-color: #2563eb; }
+
+    .send-btn {
+      background: #2563eb; color: white; border: none;
+      padding: 10px 20px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; font-weight: 500; transition: background 0.15s; white-space: nowrap;
+    }
+    .send-btn:hover:not(:disabled) { background: #1d4ed8; }
+    .send-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    .welcome {
+      text-align: center; color: #9ca3af; font-size: 13.5px;
+      line-height: 1.8; margin: auto; padding: 40px 20px;
+    }
+    .welcome strong { color: #6b7280; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Sports Dashboard / Chat</h1>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/standings">Standings</a>
+    <a href="/calendar">Calendar</a>
+    <a href="/chat">Chat</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="chat-card">
+    <div class="card-header">
+      <h2>Chat with Sports Data</h2>
+    </div>
+
+    <div id="messages">
+      <div class="welcome">
+        <strong>Ask anything about sports.</strong><br>
+        Try: "What are today's NBA scores?"<br>
+        or "Show me the Premier League standings"<br>
+        or "When do the Lakers play next?"
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea id="chatInput" rows="1" placeholder="Ask about scores, fixtures, standings..."></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  let conversationHistory = [];
+  let isWaiting = false;
+
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  });
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  function scrollToBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function addUserBubble(text) {
+    const welcome = messagesEl.querySelector('.welcome');
+    if (welcome) welcome.remove();
+    const bubble = document.createElement('div');
+    bubble.className = 'msg msg-user';
+    bubble.textContent = text;
+    messagesEl.appendChild(bubble);
+    scrollToBottom();
+  }
+
+  function addAssistantBubble(html, toolsUsed) {
+    const bubble = document.createElement('div');
+    bubble.className = 'msg msg-assistant';
+    bubble.innerHTML = html;
+    messagesEl.appendChild(bubble);
+
+    if (toolsUsed && toolsUsed.length > 0) {
+      const chip = document.createElement('div');
+      chip.className = 'tools-chip';
+      const unique = [...new Set(toolsUsed)];
+      chip.textContent = 'Tools used: ' + unique.join(', ');
+      messagesEl.appendChild(chip);
+    }
+    scrollToBottom();
+  }
+
+  function showTyping() {
+    const el = document.createElement('div');
+    el.className = 'typing';
+    el.id = 'typingIndicator';
+    el.innerHTML = '<span></span><span></span><span></span>';
+    messagesEl.appendChild(el);
+    scrollToBottom();
+  }
+
+  function hideTyping() {
+    const el = document.getElementById('typingIndicator');
+    if (el) el.remove();
+  }
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text || isWaiting) return;
+
+    isWaiting = true;
+    sendBtn.disabled = true;
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+
+    addUserBubble(text);
+    showTyping();
+
+    try {
+      const resp = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: conversationHistory,
+        }),
+      });
+
+      const data = await resp.json();
+      hideTyping();
+
+      const html = marked.parse(data.response || 'No response.');
+      addAssistantBubble(html, data.tools_used);
+
+      conversationHistory.push({ role: 'user', content: text });
+      conversationHistory.push({ role: 'assistant', content: data.response });
+    } catch (e) {
+      hideTyping();
+      addAssistantBubble('<em>Failed to reach the server. Is it running?</em>', []);
+    }
+
+    isWaiting = false;
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+
+  inputEl.focus();
+</script>
+</body>
+</html>

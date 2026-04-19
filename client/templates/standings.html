@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Standings — Sports Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; color: #111827; min-height: 100vh; }
+    header { background: white; border-bottom: 1px solid #e5e7eb; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .nav-links { display: flex; align-items: center; gap: 16px; }
+    .nav-links a { font-size: 13px; color: #2563eb; text-decoration: none; font-weight: 500; }
+
+    .league-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 20px 24px; max-width: 1000px; margin: 0 auto; }
+    .pill { padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #d1d5db; background: white; transition: all 0.15s; }
+    .pill:hover { border-color: #2563eb; color: #2563eb; }
+    .pill.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+    .card { background: white; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; max-width: 1000px; margin: 0 auto 24px; }
+    .card-header { padding: 14px 18px; border-bottom: 1px solid #f3f4f6; }
+    .card-header h2 { font-size: 14px; font-weight: 600; color: #374151; }
+    .card-body { padding: 0; overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 10px 14px; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; background: #f9fafb; position: sticky; top: 0; }
+    th.num { text-align: center; }
+    td { padding: 10px 14px; border-bottom: 1px solid #f3f4f6; }
+    td.num { text-align: center; }
+    tr:hover td { background: #f9fafb; }
+    .top-3 td { background: #f0fdf4; }
+    .team-name { font-weight: 600; }
+    .pts { font-weight: 700; color: #2563eb; }
+    .team-logo { height: 20px; vertical-align: middle; margin-right: 6px; }
+
+    .group-header { padding: 10px 14px; font-weight: 600; font-size: 13px; color: #374151; background: #f9fafb; border-top: 2px solid #e5e7eb; }
+
+    .empty { padding: 24px; color: #9ca3af; font-style: italic; text-align: center; }
+    .loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: #9ca3af; gap: 10px; }
+    .spinner { width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.65s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Standings</h1>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/search">Search</a>
+    <a href="/standings">Standings</a>
+    <a href="/calendar">Calendar</a>
+    <a href="/chat">Chat</a>
+  </div>
+</header>
+
+<div class="league-pills" id="leaguePills">
+  <div class="pill active" onclick="loadStandings('epl', this)">Premier League</div>
+  <div class="pill" onclick="loadStandings('nba', this)">NBA</div>
+  <div class="pill" onclick="loadStandings('nfl', this)">NFL</div>
+  <div class="pill" onclick="loadStandings('mlb', this)">MLB</div>
+  <div class="pill" onclick="loadStandings('nhl', this)">NHL</div>
+  <div class="pill" onclick="loadStandings('laliga', this)">La Liga</div>
+  <div class="pill" onclick="loadStandings('bundesliga', this)">Bundesliga</div>
+  <div class="pill" onclick="loadStandings('seriea', this)">Serie A</div>
+  <div class="pill" onclick="loadStandings('ligue1', this)">Ligue 1</div>
+  <div class="pill" onclick="loadStandings('mls', this)">MLS</div>
+  <div class="pill" onclick="loadStandings('ucl', this)">Champions League</div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h2 id="standingsTitle">Premier League Standings</h2></div>
+  <div class="card-body" id="standingsBody">
+    <div class="loading"><div class="spinner"></div> Loading...</div>
+  </div>
+</div>
+
+<script>
+  const leagueNames = {
+    nfl: 'NFL', nba: 'NBA', mlb: 'MLB', nhl: 'NHL',
+    epl: 'Premier League', mls: 'MLS', laliga: 'La Liga',
+    bundesliga: 'Bundesliga', seriea: 'Serie A', ligue1: 'Ligue 1', ucl: 'Champions League'
+  };
+
+  async function loadStandings(key, el) {
+    if (el) {
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+    }
+    document.getElementById('standingsTitle').textContent = `${leagueNames[key] || key} Standings`;
+    document.getElementById('standingsBody').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+    try {
+      const data = await (await fetch(`/api/standings/${key}`)).json();
+      if (!data.length) {
+        document.getElementById('standingsBody').innerHTML = '<div class="empty">No standings available</div>';
+        return;
+      }
+
+      const groups = {};
+      data.forEach(row => {
+        const g = row.group || 'Overall';
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(row);
+      });
+
+      let html = '';
+      for (const [group, rows] of Object.entries(groups)) {
+        if (Object.keys(groups).length > 1) {
+          html += `<div class="group-header">${group}</div>`;
+        }
+        html += '<table><thead><tr><th class="num">#</th><th>Team</th><th class="num">GP</th><th class="num">W</th><th class="num">D</th><th class="num">L</th><th class="num">PF</th><th class="num">PA</th><th class="num">Diff</th><th class="num">Pts</th><th>Streak</th></tr></thead><tbody>';
+        rows.forEach((row, i) => {
+          const rank = row.rank || (i + 1);
+          const cls = rank <= 3 ? 'top-3' : '';
+          const logo = row.logo ? `<img class="team-logo" src="${row.logo}">` : '';
+          html += `<tr class="${cls}">
+            <td class="num">${rank}</td>
+            <td class="team-name">${logo}${row.team || ''}</td>
+            <td class="num">${row.games_played || ''}</td>
+            <td class="num">${row.wins || ''}</td>
+            <td class="num">${row.draws || ''}</td>
+            <td class="num">${row.losses || ''}</td>
+            <td class="num">${row.goals_for || ''}</td>
+            <td class="num">${row.goals_against || ''}</td>
+            <td class="num">${row.goal_diff || ''}</td>
+            <td class="num pts">${row.points || ''}</td>
+            <td>${row.streak || ''}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+      }
+      document.getElementById('standingsBody').innerHTML = html;
+    } catch (e) {
+      document.getElementById('standingsBody').innerHTML = '<div class="empty">Error loading standings</div>';
+    }
+  }
+
+  loadStandings('epl', document.querySelector('.pill'));
+</script>
+</body>
+</html>
