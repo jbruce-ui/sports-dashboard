@@ -50,23 +50,23 @@ app = FastAPI(
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 @app.get("/search", response_class=HTMLResponse, include_in_schema=False)
 async def search_page(request: Request):
-    return templates.TemplateResponse("search.html", {"request": request})
+    return templates.TemplateResponse(request, "search.html")
 
 @app.get("/standings", response_class=HTMLResponse, include_in_schema=False)
 async def standings_page(request: Request):
-    return templates.TemplateResponse("standings.html", {"request": request})
+    return templates.TemplateResponse(request, "standings.html")
 
 @app.get("/calendar", response_class=HTMLResponse, include_in_schema=False)
 async def calendar_page(request: Request):
-    return templates.TemplateResponse("calendar.html", {"request": request})
+    return templates.TemplateResponse(request, "calendar.html")
 
 @app.get("/chat", response_class=HTMLResponse, include_in_schema=False)
 async def chat_page(request: Request):
-    return templates.TemplateResponse("chat.html", {"request": request})
+    return templates.TemplateResponse(request, "chat.html")
 
 
 # ── Proxy helpers ────────────────────────────────────────────────────
