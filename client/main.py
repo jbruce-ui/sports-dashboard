@@ -22,20 +22,17 @@ MCP_SERVER_URL = f"{SPORTS_SERVER}/mcp"
 
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
-_mcp_session: ClientSession | None = None
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _mcp_session
-    async with streamable_http_client(MCP_SERVER_URL) as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            _mcp_session = session
-            tools = await session.list_tools()
-            print(f"Connected to Sports MCP Server — {len(tools.tools)} tools: {[t.name for t in tools.tools]}")
-            yield
-    _mcp_session = None
+    try:
+        async with streamable_http_client(MCP_SERVER_URL) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                tools = await session.list_tools()
+                print(f"Connected to Sports MCP Server — {len(tools.tools)} tools: {[t.name for t in tools.tools]}")
+    except Exception as e:
+        print(f"Warning: Could not connect to MCP server at startup: {e}")
+    yield
 
 
 app = FastAPI(
@@ -257,80 +254,79 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat", tags=["chat"])
 async def chat(body: ChatRequest):
-    if _mcp_session is None:
-        return {"response": "Sports MCP server is not connected.", "tools_used": []}
-
-    tools_result = await _mcp_session.list_tools()
-    anthropic_tools = [
-        {
-            "name": tool.name,
-            "description": tool.description or "",
-            "input_schema": tool.inputSchema,
-        }
-        for tool in tools_result.tools
-    ]
+    from datetime import date as dt_date
 
     messages: list[dict] = [
         {"role": m.role, "content": m.content} for m in body.history
     ]
     messages.append({"role": "user", "content": body.message})
-
-    from datetime import date as dt_date
     system = CHAT_SYSTEM_PROMPT.format(date=dt_date.today().isoformat())
-
     client = anthropic.AsyncAnthropic()
     tools_used: list[str] = []
 
     try:
-        for _ in range(10):
-            response = await client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=2048,
-                system=system,
-                tools=anthropic_tools,
-                messages=messages,
-            )
+        async with streamable_http_client(MCP_SERVER_URL) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                tools_result = await session.list_tools()
+                anthropic_tools = [
+                    {
+                        "name": tool.name,
+                        "description": tool.description or "",
+                        "input_schema": tool.inputSchema,
+                    }
+                    for tool in tools_result.tools
+                ]
 
-            if response.stop_reason == "tool_use":
-                assistant_content = []
-                for block in response.content:
-                    if block.type == "text":
-                        assistant_content.append({"type": "text", "text": block.text})
-                    elif block.type == "tool_use":
-                        assistant_content.append({
-                            "type": "tool_use",
-                            "id": block.id,
-                            "name": block.name,
-                            "input": block.input,
-                        })
-                messages.append({"role": "assistant", "content": assistant_content})
+                for _ in range(10):
+                    response = await client.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=2048,
+                        system=system,
+                        tools=anthropic_tools,
+                        messages=messages,
+                    )
 
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        mcp_result = await _mcp_session.call_tool(block.name, block.input)
-                        if mcp_result.content:
-                            result_text = "\n".join(
-                                item.text for item in mcp_result.content if hasattr(item, "text")
-                            )
-                        elif hasattr(mcp_result, "structuredContent") and mcp_result.structuredContent is not None:
-                            result_text = json.dumps(mcp_result.structuredContent)
-                        else:
-                            result_text = "{}"
-                        tools_used.append(block.name)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result_text,
-                        })
-                messages.append({"role": "user", "content": tool_results})
-            else:
-                text = "".join(
-                    block.text for block in response.content if hasattr(block, "text")
-                )
-                return {"response": text, "tools_used": tools_used}
+                    if response.stop_reason == "tool_use":
+                        assistant_content = []
+                        for block in response.content:
+                            if block.type == "text":
+                                assistant_content.append({"type": "text", "text": block.text})
+                            elif block.type == "tool_use":
+                                assistant_content.append({
+                                    "type": "tool_use",
+                                    "id": block.id,
+                                    "name": block.name,
+                                    "input": block.input,
+                                })
+                        messages.append({"role": "assistant", "content": assistant_content})
 
-        return {"response": "I had trouble processing that request. Please try again.", "tools_used": tools_used}
+                        tool_results = []
+                        for block in response.content:
+                            if block.type == "tool_use":
+                                mcp_result = await session.call_tool(block.name, block.input)
+                                if mcp_result.content:
+                                    result_text = "\n".join(
+                                        item.text for item in mcp_result.content if hasattr(item, "text")
+                                    )
+                                elif hasattr(mcp_result, "structuredContent") and mcp_result.structuredContent is not None:
+                                    result_text = json.dumps(mcp_result.structuredContent)
+                                else:
+                                    result_text = "{}"
+                                tools_used.append(block.name)
+                                tool_results.append({
+                                    "type": "tool_result",
+                                    "tool_use_id": block.id,
+                                    "content": result_text,
+                                })
+                        messages.append({"role": "user", "content": tool_results})
+                    else:
+                        text = "".join(
+                            block.text for block in response.content if hasattr(block, "text")
+                        )
+                        return {"response": text, "tools_used": tools_used}
+
+                return {"response": "I had trouble processing that request. Please try again.", "tools_used": tools_used}
     except Exception as e:
         return {"response": f"Sorry, I encountered an error: {e}", "tools_used": tools_used}
 
